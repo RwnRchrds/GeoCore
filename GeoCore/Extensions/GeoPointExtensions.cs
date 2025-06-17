@@ -69,7 +69,8 @@ namespace GeoCore.Extensions
         /// <param name="bearingDegrees">The initial bearing (in degrees).</param>
         /// <param name="unit">The distance unit (default: kilometers).</param>
         /// <returns>A new GeoPoint at the destination location.</returns>
-        public static GeoPoint Move(this GeoPoint point, double distance, double bearingDegrees, DistanceUnit unit = DistanceUnit.Kilometers)
+        public static GeoPoint Move(this GeoPoint point, double distance, double bearingDegrees,
+            DistanceUnit unit = DistanceUnit.Kilometers)
         {
             double angularDistance = DistanceConverter.ToKilometers(distance, unit) / GeoConstants.EarthRadiusKm;
             double bearingRad = AngleConverter.DegreesToRadians(bearingDegrees);
@@ -103,7 +104,8 @@ namespace GeoCore.Extensions
         /// <param name="radius">The radius of the circle to enclose.</param>
         /// <param name="unit">The unit of the radius.</param>
         /// <returns>A GeoBoundingBox surrounding the point within the radius.</returns>
-        public static GeoBoundingBox GetBoundingBox(this GeoPoint point, double radius, DistanceUnit unit = DistanceUnit.Kilometers)
+        public static GeoBoundingBox GetBoundingBox(this GeoPoint point, double radius,
+            DistanceUnit unit = DistanceUnit.Kilometers)
         {
             // Convert to kilometers
             var radiusKm = DistanceConverter.ToKilometers(radius, unit);
@@ -121,6 +123,33 @@ namespace GeoCore.Extensions
                 MaxLatitude: point.Latitude + deltaLat,
                 MaxLongitude: point.Longitude + deltaLon
             );
+        }
+
+        /// <summary>
+        /// Converts the GeoPoint to a string in DMS (Degrees, Minutes, Seconds) format with N/S/E/W.
+        /// </summary>
+        /// <param name="point">The point to format.</param>
+        /// <returns>A formatted string like "51°30'26.4"N, 0°7'39.1"W"</returns>
+        public static string ToDmsString(this GeoPoint point)
+        {
+            static string FormatDms(double decimalDegrees, bool isLatitude)
+            {
+                var degrees = Math.Floor(Math.Abs(decimalDegrees));
+                var minutesFull = (Math.Abs(decimalDegrees) - degrees) * 60;
+                var minutes = Math.Floor(minutesFull);
+                var seconds = (minutesFull - minutes) * 60;
+
+                var hemisphere = isLatitude
+                    ? (decimalDegrees >= 0 ? "N" : "S")
+                    : (decimalDegrees >= 0 ? "E" : "W");
+
+                return $"{degrees:0}°{minutes:00}'{seconds:00.00}\"{hemisphere}";
+            }
+
+            var latStr = FormatDms(point.Latitude, isLatitude: true);
+            var lonStr = FormatDms(point.Longitude, isLatitude: false);
+
+            return $"{latStr}, {lonStr}";
         }
     }
 }

@@ -75,5 +75,37 @@ namespace GeoCore.Tests.Extensions
 
             Assert.That(box.Contains(london), Is.True);
         }
+        
+        [Test]
+        public void ToDmsString_NorthernEasternHemisphere_ReturnsCorrectFormat()
+        {
+            var point = new GeoPoint(51.5074, 0.1278); // London
+            var result = point.ToDmsString();
+            Assert.That(result, Is.EqualTo("51°30'26.64\"N, 0°07'40.08\"E"));
+        }
+
+        [Test]
+        public void ToDmsString_SouthernWesternHemisphere_ReturnsCorrectFormat()
+        {
+            var point = new GeoPoint(-33.9249, -18.4241); // Cape Town
+            var result = point.ToDmsString();
+            Assert.That(result, Is.EqualTo("33°55'29.64\"S, 18°25'26.76\"W"));
+        }
+
+        [Test]
+        public void ToDmsString_ZeroCoordinates_ReturnsCorrectFormat()
+        {
+            var point = new GeoPoint(0, 0);
+            var result = point.ToDmsString();
+            Assert.That(result, Is.EqualTo("0°00'00.00\"N, 0°00'00.00\"E"));
+        }
+
+        [Test]
+        public void ToDmsString_PrecisionIsCorrect()
+        {
+            var point = new GeoPoint(10.123456, -20.654321);
+            var result = point.ToDmsString();
+            Assert.That(result, Is.EqualTo("10°07'24.44\"N, 20°39'15.56\"W"));
+        }
     }
 }
