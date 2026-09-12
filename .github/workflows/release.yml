@@ -3,6 +3,14 @@ name: Release
 # Publishing is driven by the tag, not by the <Version> in the csproj. That way
 # there is only one place to get right, and a mistyped tag cannot ship a package
 # numbered differently from the release it came from.
+#
+# Authentication uses NuGet Trusted Publishing: the job exchanges a GitHub OIDC
+# token for an API key that lives for one hour. There is no long-lived secret to
+# leak or rotate.
+#
+# IMPORTANT: the trust policy on nuget.org is bound to this file's *name*.
+# Renaming or moving this workflow will break publishing until the policy is
+# updated to match. See RELEASING.md.
 on:
   push:
     tags: ['v*']
@@ -13,16 +21,17 @@ on:
         required: true
         type: string
 
-permissions:
-  contents: write        # needed to create the GitHub release
-
 jobs:
   release:
     name: Publish to NuGet
     runs-on: ubuntu-latest
 
-    # Add a required reviewer to this environment in repo settings if you want a
-    # manual gate before anything reaches nuget.org.
+    permissions:
+      contents: write     # create the GitHub release
+      id-token: write     # request the OIDC token for Trusted Publishing
+
+    # The trust policy may be scoped to this environment. Add a required reviewer
+    # to it in repo settings if you want a manual gate before anything ships.
     environment: nuget
 
     steps:
@@ -68,6 +77,18 @@ jobs:
           echo "prerelease=$PRERELEASE" >> "$GITHUB_OUTPUT"
           echo "Publishing version $VERSION (prerelease: $PRERELEASE)"
 
+      # Fail before building rather than after, if the account is not configured.
+      - name: Check the NuGet account is configured
+        env:
+          NUGET_USER: ${{ vars.NUGET_USER || secrets.NUGET_USER }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "${NUGET_USER:-}" ]; then
+            echo "::error::Set NUGET_USER to your nuget.org username (the profile name, not your email address). See RELEASING.md."
+            exit 1
+          fi
+
       - name: Restore
         run: dotnet restore
 
@@ -94,18 +115,22 @@ jobs:
             unzip -l "$package"
           done
 
+      # The issued key is valid for one hour and single-use, so request it here,
+      # immediately before pushing, rather than at the top of the job.
+      - name: Exchange the OIDC token for a short-lived NuGet key
+        id: login
+        uses: NuGet/login@v1
+        with:
+          user: ${{ vars.NUGET_USER || secrets.NUGET_USER }}
+
       # --skip-duplicate keeps a re-run from failing if the push already landed.
       # The adjacent .snupkg symbol package is picked up automatically.
       - name: Push to NuGet
         env:
-          NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
+          # Via env rather than inline, so the key cannot be rendered into the log.
+          NUGET_API_KEY: ${{ steps.login.outputs.NUGET_API_KEY }}
         run: |
           set -euo pipefail
-
-          if [ -z "${NUGET_API_KEY:-}" ]; then
-            echo "::error::The NUGET_API_KEY secret is not set. See RELEASING.md."
-            exit 1
-          fi
 
           dotnet nuget push './artifacts/*.nupkg' \
             --source https://api.nuget.org/v3/index.json \

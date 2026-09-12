@@ -4,34 +4,63 @@ Releases are driven by git tags. Pushing a tag matching `v*` runs
 [`.github/workflows/release.yml`](.github/workflows/release.yml), which builds,
 tests, packs, publishes to nuget.org and opens a GitHub release.
 
+Authentication uses **NuGet Trusted Publishing**. The workflow exchanges a
+GitHub OIDC token for an API key valid for one hour, so there is no long-lived
+key stored in this repository to leak, rotate or forget about. NuGet.org
+verifies the token against a policy that names this exact repository and
+workflow file, so only a run of *this* workflow in *this* repository can publish.
+
 ## One-time setup
 
-The workflow cannot run until an API key exists. This has to be done by hand —
-it is the only manual step.
+Two things, both in a browser. Neither involves a secret key.
 
-1. **Create a NuGet API key.** Sign in at <https://www.nuget.org>, then
-   *Account → API Keys → Create*.
-   - **Key name:** `GeoCore CI`
-   - **Glob pattern:** `GeoCore` — scope it to this package only, so a leaked
-     key cannot be used to push anything else you own.
-   - **Scopes:** *Push new packages and package versions*.
-   - Set an expiry you will actually notice (365 days is the maximum).
+### 1. Create the Trusted Publishing policy
 
-   The `GeoCore` package ID is currently unclaimed. The first successful push
-   claims it, and NuGet then reserves it to your account.
+On <https://www.nuget.org>: sign in, click your username, choose
+**Trusted Publishing**, then create a policy with:
 
-2. **Add it to the repository.** *Settings → Secrets and variables → Actions →
-   New repository secret*:
-   - **Name:** `NUGET_API_KEY`
-   - **Value:** the key from step 1
+| Field | Value |
+| --- | --- |
+| **Repository Owner** | `RwnRchrds` |
+| **Repository** | `GeoCore` |
+| **Workflow File** | `release.yml` |
+| **Environment** | `nuget` |
 
-   The workflow fails with a clear message if this secret is missing, rather
-   than getting as far as a half-finished publish.
+Two things that catch people out:
 
-3. **Optional: require approval before publishing.** The job runs in an
-   environment called `nuget`, created automatically on first run. To add a
-   manual gate, go to *Settings → Environments → nuget* and add yourself as a
-   required reviewer. Publishing then waits for your approval.
+- **Workflow File is the file name only** — `release.yml`, *not*
+  `.github/workflows/release.yml`.
+- **Environment must be `nuget`**, because the job declares
+  `environment: nuget`. If you leave it blank the policy still works, but
+  filling it in is the more restrictive option and therefore the better one.
+
+For **Scopes**, the policy must allow **publishing new packages** as well as new
+versions, with a glob pattern of `GeoCore`. The `GeoCore` ID has never been
+published, so the first release is a *new package* push — a policy scoped only
+to new versions of existing packages will reject it. Scoping the glob to
+`GeoCore` also means this policy cannot be used to push anything else you own.
+
+Choose yourself as the **policy owner** unless GeoCore belongs to a nuget.org
+organization. A policy owned by an organization goes inactive if you are later
+removed from it.
+
+### 2. Set your nuget.org username
+
+The login action needs your nuget.org **profile name** — not your email address.
+Add it under *Settings → Secrets and variables → Actions*:
+
+- As a **variable** named `NUGET_USER` (recommended: it is not sensitive, and
+  variables are visible in the UI, which makes a misconfiguration obvious), or
+- as a **secret** named `NUGET_USER` if you prefer. The workflow accepts either.
+
+The workflow fails early, before building, with a pointed message if this is
+missing.
+
+### 3. Optional: require approval before publishing
+
+The job runs in an environment called `nuget`, created automatically on first
+run. To add a manual gate, go to *Settings → Environments → nuget* and add
+yourself as a required reviewer. Publishing then waits for your approval.
 
 ## Cutting a release
 
@@ -59,13 +88,16 @@ gh run watch
 
 1. Resolves the version from the tag, rejecting anything that is not valid
    semver — a mistyped tag fails before anything is published.
-2. Builds and **runs the full test suite**. A failing test stops the release.
-3. Packs the library (both target frameworks, README, XML docs, Source Link)
+2. Checks `NUGET_USER` is set, before spending time on a build.
+3. Builds and **runs the full test suite**. A failing test stops the release.
+4. Packs the library (both target frameworks, README, XML docs, Source Link)
    plus a `.snupkg` symbol package.
-4. Lists the package contents into the log, so you can see exactly what shipped.
-5. Pushes to nuget.org with `--skip-duplicate`, so re-running a partially failed
+5. Lists the package contents into the log, so you can see exactly what shipped.
+6. Exchanges the OIDC token for a one-hour NuGet key. This happens immediately
+   before the push, because the key is short-lived and single-use.
+7. Pushes to nuget.org with `--skip-duplicate`, so re-running a partially failed
    release is safe.
-6. Creates a GitHub release with generated notes and the `.nupkg` attached.
+8. Creates a GitHub release with generated notes and the `.nupkg` attached.
 
 A version containing a hyphen (`v1.0.0-beta.1`) is published as a prerelease and
 marked as such on both NuGet and the GitHub release.
@@ -75,6 +107,24 @@ marked as such on both NuGet and the GitHub release.
 Use *Actions → Release → Run workflow* and enter a version (a leading `v` is
 accepted but not required). This tags the current commit for you. Useful for a
 re-run after a transient failure, but prefer tagging for real releases.
+
+## If publishing fails
+
+- **`Unable to get an access token`, or the login step fails.** The policy on
+  nuget.org does not match the run. Check the repository owner, the repository
+  name, that **Workflow File** is `release.yml` with no path, and that
+  **Environment** is either `nuget` or blank.
+- **The push is rejected on the very first release.** The policy's scopes
+  probably do not permit publishing *new* packages. See step 1.
+- **It worked before and now fails after a rename.** The policy is bound to the
+  workflow file name. Renaming or moving `release.yml` breaks it until the policy
+  is updated.
+- **The policy shows as pending or inactive.** Policies on private repositories
+  start out active for only 7 days, because NuGet needs the repository and owner
+  IDs from a real publish to pin the policy against repo-recreation attacks.
+  GeoCore is public, so this should not apply; if it appears, restart the 7-day
+  window from the policy page. A policy also goes inactive if it is owned by an
+  organization you have left.
 
 ## Versioning
 
