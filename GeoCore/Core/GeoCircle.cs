@@ -158,8 +158,10 @@ namespace GeoCore.Core
         }
 
         /// <inheritdoc />
-        public override string ToString() => string.Format(
-            CultureInfo.InvariantCulture,
-            "GeoCircle(Center: {0:D}, Radius: {1:F3} km)", Center, Radius());
+        public override string ToString() =>
+            // Call the point's formatter directly rather than relying on a "D" specifier
+            // being dispatched through IFormattable at runtime.
+            "GeoCircle(Center: " + Center.ToString("D", CultureInfo.InvariantCulture) +
+            ", Radius: " + Radius().ToString("F3", CultureInfo.InvariantCulture) + " km)";
     }
 }

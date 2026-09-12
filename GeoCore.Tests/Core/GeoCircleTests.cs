@@ -142,6 +142,34 @@ namespace GeoCore.Tests.Core
         }
 
         [Test]
+        public void ToString_ReportsTheCentreAndRadius()
+        {
+            var circle = new GeoCircle(new GeoPoint(51.5074, -0.1278), 10);
+
+            Assert.That(circle.ToString(),
+                Is.EqualTo("GeoCircle(Center: 51.507400, -0.127800, Radius: 10.000 km)"));
+        }
+
+        [Test]
+        public void ToString_DoesNotChangeWithTheAmbientCulture()
+        {
+            var original = System.Globalization.CultureInfo.CurrentCulture;
+
+            try
+            {
+                System.Globalization.CultureInfo.CurrentCulture =
+                    new System.Globalization.CultureInfo("de-DE");
+
+                Assert.That(new GeoCircle(new GeoPoint(51.5074, -0.1278), 10).ToString(),
+                    Does.Contain("51.507400").And.Contain("10.000"));
+            }
+            finally
+            {
+                System.Globalization.CultureInfo.CurrentCulture = original;
+            }
+        }
+
+        [Test]
         public void Equality_ComparesCentreAndRadius()
         {
             var tenKilometres = new GeoCircle(London, 10);
