@@ -97,7 +97,9 @@ gh run watch
    before the push, because the key is short-lived and single-use.
 7. Pushes to nuget.org with `--skip-duplicate`, so re-running a partially failed
    release is safe.
-8. Creates a GitHub release with generated notes and the `.nupkg` attached.
+8. Creates a GitHub release titled `v<version>`, with the library and symbol
+   packages attached. The notes lead with install instructions and a link to the
+   package on NuGet, followed by GitHub's generated commit/PR notes.
 
 A version containing a hyphen (`v1.0.0-beta.1`) is published as a prerelease and
 marked as such on both NuGet and the GitHub release.

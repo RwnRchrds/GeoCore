@@ -145,7 +145,29 @@ jobs:
         run: |
           set -euo pipefail
 
-          FLAGS=(--title "v$VERSION" --generate-notes)
+          # Ask GitHub for the commit/PR notes it would have generated, so they can
+          # be placed *below* the install instructions rather than instead of them.
+          GENERATED=$(gh api "repos/$GITHUB_REPOSITORY/releases/generate-notes" \
+            -f tag_name="v$VERSION" \
+            -f target_commitish="$GITHUB_SHA" \
+            --jq '.body' 2>/dev/null || true)
+
+          {
+            echo '## Install'
+            echo
+            echo '```bash'
+            echo "dotnet add package GeoCore --version $VERSION"
+            echo '```'
+            echo
+            echo "[GeoCore $VERSION on NuGet](https://www.nuget.org/packages/GeoCore/$VERSION)"
+
+            if [ -n "${GENERATED:-}" ]; then
+              echo
+              echo "$GENERATED"
+            fi
+          } > release-notes.md
+
+          FLAGS=(--title "v$VERSION" --notes-file release-notes.md)
           if [ "$PRERELEASE" = "true" ]; then
             FLAGS+=(--prerelease)
           fi
@@ -155,7 +177,8 @@ jobs:
             FLAGS+=(--target "$GITHUB_SHA")
           fi
 
-          gh release create "v$VERSION" ./artifacts/*.nupkg "${FLAGS[@]}"
+          # Attach the symbol package alongside the library package.
+          gh release create "v$VERSION" ./artifacts/*.nupkg ./artifacts/*.snupkg "${FLAGS[@]}"
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
