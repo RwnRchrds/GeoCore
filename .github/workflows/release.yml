@@ -1,0 +1,139 @@
+name: Release
+
+# Publishing is driven by the tag, not by the <Version> in the csproj. That way
+# there is only one place to get right, and a mistyped tag cannot ship a package
+# numbered differently from the release it came from.
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to publish, without a leading v (e.g. 1.0.0 or 1.0.0-beta.1).'
+        required: true
+        type: string
+
+permissions:
+  contents: write        # needed to create the GitHub release
+
+jobs:
+  release:
+    name: Publish to NuGet
+    runs-on: ubuntu-latest
+
+    # Add a required reviewer to this environment in repo settings if you want a
+    # manual gate before anything reaches nuget.org.
+    environment: nuget
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Source Link embeds commit details, which needs the full history.
+          fetch-depth: 0
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Resolve version
+        id: version
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+
+          if [ -n "${INPUT_VERSION:-}" ]; then
+            VERSION="$INPUT_VERSION"
+          else
+            VERSION="$GITHUB_REF_NAME"
+          fi
+
+          # Tolerate a leading "v" from either source; someone will always type it.
+          VERSION="${VERSION#v}"
+
+          # Refuse to publish something that is not a sensible version.
+          if ! printf '%s' "$VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z][0-9A-Za-z.-]*)?$'; then
+            echo "::error::'$VERSION' is not a valid semantic version."
+            exit 1
+          fi
+
+          # A hyphen means a prerelease tag such as 1.0.0-beta.1.
+          case "$VERSION" in
+            *-*) PRERELEASE=true ;;
+            *)   PRERELEASE=false ;;
+          esac
+
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "prerelease=$PRERELEASE" >> "$GITHUB_OUTPUT"
+          echo "Publishing version $VERSION (prerelease: $PRERELEASE)"
+
+      - name: Restore
+        run: dotnet restore
+
+      - name: Build
+        run: >
+          dotnet build --configuration Release --no-restore
+          -p:Version=${{ steps.version.outputs.version }}
+
+      # Never publish a version whose tests do not pass.
+      - name: Test
+        run: dotnet test --configuration Release --no-build
+
+      - name: Pack
+        run: >
+          dotnet pack GeoCore/GeoCore.csproj --configuration Release --no-build
+          -p:Version=${{ steps.version.outputs.version }}
+          --output ./artifacts
+
+      - name: List package contents
+        run: |
+          set -euo pipefail
+          for package in ./artifacts/*.nupkg; do
+            echo "== $package"
+            unzip -l "$package"
+          done
+
+      # --skip-duplicate keeps a re-run from failing if the push already landed.
+      # The adjacent .snupkg symbol package is picked up automatically.
+      - name: Push to NuGet
+        env:
+          NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "${NUGET_API_KEY:-}" ]; then
+            echo "::error::The NUGET_API_KEY secret is not set. See RELEASING.md."
+            exit 1
+          fi
+
+          dotnet nuget push './artifacts/*.nupkg' \
+            --source https://api.nuget.org/v3/index.json \
+            --api-key "$NUGET_API_KEY" \
+            --skip-duplicate
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.version }}
+          PRERELEASE: ${{ steps.version.outputs.prerelease }}
+        run: |
+          set -euo pipefail
+
+          FLAGS=(--title "v$VERSION" --generate-notes)
+          if [ "$PRERELEASE" = "true" ]; then
+            FLAGS+=(--prerelease)
+          fi
+
+          # A manual run has no tag of its own, so make one at the current commit.
+          if ! git rev-parse "v$VERSION" >/dev/null 2>&1; then
+            FLAGS+=(--target "$GITHUB_SHA")
+          fi
+
+          gh release create "v$VERSION" ./artifacts/*.nupkg "${FLAGS[@]}"
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: nupkg-${{ steps.version.outputs.version }}
+          path: ./artifacts/*

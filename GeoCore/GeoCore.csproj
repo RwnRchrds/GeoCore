@@ -18,6 +18,11 @@
   <!-- NuGet package metadata -->
   <PropertyGroup>
     <PackageId>GeoCore</PackageId>
+    <!--
+      Local/dev default only. Releases take their version from the git tag:
+      the Release workflow passes -p:Version=<tag>, which overrides this.
+      See RELEASING.md.
+    -->
     <Version>0.2.0</Version>
     <Authors>Rowan Richards</Authors>
     <Description>A clean, modern, dependency-light .NET library for geospatial maths: great-circle and ellipsoidal (Vincenty) distance, bearings, rhumb lines, cross-track/along-track distance, polygons with holes, routes, bounding boxes, circles, unit conversion, and GeoJSON/WKT/geohash/encoded-polyline interop.</Description>

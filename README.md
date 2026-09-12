@@ -215,6 +215,10 @@ dotnet test
 dotnet pack GeoCore/GeoCore.csproj -c Release
 ```
 
+## Releasing
+
+Releases are cut by pushing a `v*` tag; see [RELEASING.md](RELEASING.md).
+
 ## Licence
 
 MIT — see [LICENSE.txt](LICENSE.txt).
