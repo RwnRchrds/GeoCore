@@ -75,7 +75,7 @@ namespace GeoCore.Tests.Extensions
 
             Assert.That(box.Contains(london), Is.True);
         }
-        
+
         [Test]
         public void ToDmsString_NorthernEasternHemisphere_ReturnsCorrectFormat()
         {
