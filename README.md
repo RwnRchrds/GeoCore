@@ -25,8 +25,11 @@ bearing, movement, areas, routes, polygons and the formats you need to get data 
 ## Installation
 
 ```bash
-dotnet add package GeoCore
+dotnet add package BlockSoftware.GeoCore
 ```
+
+The package ID carries a prefix, but the namespaces do not — you still write
+`using GeoCore.Core;`.
 
 ## Quick start
 

@@ -156,10 +156,10 @@ jobs:
             echo '## Install'
             echo
             echo '```bash'
-            echo "dotnet add package GeoCore --version $VERSION"
+            echo "dotnet add package BlockSoftware.GeoCore --version $VERSION"
             echo '```'
             echo
-            echo "[GeoCore $VERSION on NuGet](https://www.nuget.org/packages/GeoCore/$VERSION)"
+            echo "[BlockSoftware.GeoCore $VERSION on NuGet](https://www.nuget.org/packages/BlockSoftware.GeoCore/$VERSION)"
 
             if [ -n "${GENERATED:-}" ]; then
               echo

@@ -35,10 +35,16 @@ Two things that catch people out:
   filling it in is the more restrictive option and therefore the better one.
 
 For **Scopes**, the policy must allow **publishing new packages** as well as new
-versions, with a glob pattern of `GeoCore`. The `GeoCore` ID has never been
+versions, with a glob pattern of `BlockSoftware.GeoCore` (or `BlockSoftware.*`
+if you plan to publish more packages under that prefix). The ID has never been
 published, so the first release is a *new package* push — a policy scoped only
-to new versions of existing packages will reject it. Scoping the glob to
-`GeoCore` also means this policy cannot be used to push anything else you own.
+to new versions of existing packages will reject it. Keeping the glob narrow
+also means this policy cannot be used to push anything else you own.
+
+> **The glob must match the package ID, not the repository name.** The package
+> is `BlockSoftware.GeoCore`, not `GeoCore`: nuget.org rejects a bare `GeoCore`
+> as too similar to the existing `Geo.Core` package. A policy still scoped to
+> `GeoCore` will not authorise the push.
 
 Choose yourself as the **policy owner** unless GeoCore belongs to a nuget.org
 organization. A policy owned by an organization goes inactive if you are later
@@ -127,6 +133,22 @@ re-run after a transient failure, but prefer tagging for real releases.
   GeoCore is public, so this should not apply; if it appears, restart the 7-day
   window from the policy page. A policy also goes inactive if it is owned by an
   organization you have left.
+
+## The package ID
+
+The package is published as **`BlockSoftware.GeoCore`**. nuget.org's
+typosquatting protection rejects a bare `GeoCore`, because it is too similar to
+the existing `Geo.Core` package.
+
+Only the package ID is prefixed. `AssemblyName` and the namespaces are still
+`GeoCore`, so consumers write `using GeoCore.Core;` regardless. Changing the
+package ID is not a breaking change for existing code, but it does mean anyone
+already referencing an old ID has to change their `PackageReference`.
+
+Worth considering once published: applying for
+[ID prefix reservation](https://learn.microsoft.com/en-us/nuget/nuget-org/id-prefix-reservation)
+on `BlockSoftware.`, which stops anyone else publishing under that prefix and
+puts a verified-owner tick on the package page.
 
 ## Versioning
 

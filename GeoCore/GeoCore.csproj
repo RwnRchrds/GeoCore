@@ -17,7 +17,12 @@
 
   <!-- NuGet package metadata -->
   <PropertyGroup>
-    <PackageId>GeoCore</PackageId>
+    <!--
+      The package ID is prefixed because nuget.org rejects "GeoCore" as too
+      similar to the existing "Geo.Core". The assembly and namespaces stay
+      GeoCore, so consumers still write `using GeoCore.Core;`.
+    -->
+    <PackageId>BlockSoftware.GeoCore</PackageId>
     <!--
       Local/dev default only. Releases take their version from the git tag:
       the Release workflow passes -p:Version=<tag>, which overrides this.
